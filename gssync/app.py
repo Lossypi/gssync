@@ -224,3 +224,12 @@ class MainScreen(Screen):
 
     def action_edit_paths(self) -> None:
         self.app.push_screen(SetupScreen())
+
+
+class GSyncApp(App):
+    def on_mount(self) -> None:
+        cfg = load_config()
+        if not cfg.spreadsheet_url or not cfg.file_path:
+            self.push_screen(SetupScreen())
+        else:
+            self.push_screen(MainScreen())
