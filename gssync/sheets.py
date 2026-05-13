@@ -34,8 +34,15 @@ def list_sheet_names(spreadsheet: gspread.Spreadsheet) -> List[str]:
     return [ws.title for ws in spreadsheet.worksheets()]
 
 
+def _normalize(cell: object) -> object:
+    if isinstance(cell, (str, int, float, type(None))):
+        return cell
+    return str(cell)
+
+
 def read_sheet(spreadsheet: gspread.Spreadsheet, name: str) -> List[List]:
-    return spreadsheet.worksheet(name).get_all_values(value_render_option="FORMULA")
+    rows = spreadsheet.worksheet(name).get_all_values(value_render_option="FORMULA")
+    return [[_normalize(cell) for cell in row] for row in rows]
 
 
 def write_sheet(spreadsheet: gspread.Spreadsheet, name: str, data: List[List]) -> None:
