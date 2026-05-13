@@ -35,7 +35,7 @@ def list_sheet_names(spreadsheet: gspread.Spreadsheet) -> List[str]:
 
 
 def read_sheet(spreadsheet: gspread.Spreadsheet, name: str) -> List[List]:
-    return spreadsheet.worksheet(name).get_all_values(value_render_option="FORMATTED_VALUE")
+    return spreadsheet.worksheet(name).get_all_values(value_render_option="FORMULA")
 
 
 def write_sheet(spreadsheet: gspread.Spreadsheet, name: str, data: List[List]) -> None:
@@ -47,4 +47,4 @@ def write_sheet(spreadsheet: gspread.Spreadsheet, name: str, data: List[List]) -
         ws = spreadsheet.add_worksheet(title=name, rows=rows, cols=cols)
     ws.clear()
     if data:
-        ws.update(data)
+        ws.update(data, value_input_option="USER_ENTERED")
