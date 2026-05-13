@@ -57,5 +57,56 @@ def list_local_sheets(file_path: str, file_format: str = "xlsx") -> str:
     return f"Sheets: {', '.join(names)}"
 
 
+@mcp.tool()
+def pull_sheet(
+    spreadsheet_url: str,
+    sheet_name: str,
+    file_path: str,
+    file_format: str = "xlsx",
+) -> str:
+    client = get_client()
+    spreadsheet = open_spreadsheet(client, spreadsheet_url)
+    _pull_sheet(spreadsheet, sheet_name, Path(file_path), file_format)
+    return f"Pulled '{sheet_name}' from {spreadsheet_url} → {file_path}"
+
+
+@mcp.tool()
+def pull_all(
+    spreadsheet_url: str,
+    file_path: str,
+    file_format: str = "xlsx",
+) -> str:
+    client = get_client()
+    spreadsheet = open_spreadsheet(client, spreadsheet_url)
+    names = list_sheet_names(spreadsheet)
+    _pull_all(spreadsheet, Path(file_path), file_format)
+    return f"Pulled {len(names)} sheets from {spreadsheet_url} → {file_path}"
+
+
+@mcp.tool()
+def push_sheet(
+    spreadsheet_url: str,
+    sheet_name: str,
+    file_path: str,
+    file_format: str = "xlsx",
+) -> str:
+    client = get_client()
+    spreadsheet = open_spreadsheet(client, spreadsheet_url)
+    _push_sheet(spreadsheet, sheet_name, Path(file_path), file_format)
+    return f"Pushed '{sheet_name}' from {file_path} → {spreadsheet_url}"
+
+
+@mcp.tool()
+def push_all(
+    spreadsheet_url: str,
+    file_path: str,
+    file_format: str = "xlsx",
+) -> str:
+    client = get_client()
+    spreadsheet = open_spreadsheet(client, spreadsheet_url)
+    _push_all(spreadsheet, Path(file_path), file_format)
+    return f"Pushed all sheets from {file_path} → {spreadsheet_url}"
+
+
 if __name__ == "__main__":
     mcp.run()

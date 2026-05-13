@@ -2,7 +2,16 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from gssync.config import Config
-from gssync.mcp_server import get_config, list_google_sheets, list_local_sheets, set_config
+from gssync.mcp_server import (
+    get_config,
+    list_google_sheets,
+    list_local_sheets,
+    pull_all,
+    pull_sheet,
+    push_all,
+    push_sheet,
+    set_config,
+)
 
 
 def test_get_config_returns_formatted_string():
@@ -62,3 +71,63 @@ def test_list_local_sheets_empty_file():
     with patch("gssync.mcp_server._list_local_sheets", return_value=[]):
         result = list_local_sheets("C:\\data\\report.xlsx")
     assert "No sheets" in result
+
+
+def test_pull_sheet_calls_sync_and_returns_message():
+    mock_spreadsheet = MagicMock()
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_spreadsheet), \
+         patch("gssync.mcp_server._pull_sheet") as mock_pull:
+        result = pull_sheet(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            sheet_name="Sheet1",
+            file_path="C:\\data\\report.xlsx",
+        )
+    mock_pull.assert_called_once_with(
+        mock_spreadsheet, "Sheet1", Path("C:\\data\\report.xlsx"), "xlsx"
+    )
+    assert "Sheet1" in result
+    assert "C:\\data\\report.xlsx" in result
+
+
+def test_pull_all_calls_sync_and_returns_count():
+    mock_spreadsheet = MagicMock()
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_spreadsheet), \
+         patch("gssync.mcp_server.list_sheet_names", return_value=["A", "B", "C"]), \
+         patch("gssync.mcp_server._pull_all") as mock_pull_all:
+        result = pull_all(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            file_path="C:\\data\\report.xlsx",
+        )
+    mock_pull_all.assert_called_once()
+    assert "3" in result
+
+
+def test_push_sheet_calls_sync_and_returns_message():
+    mock_spreadsheet = MagicMock()
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_spreadsheet), \
+         patch("gssync.mcp_server._push_sheet") as mock_push:
+        result = push_sheet(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            sheet_name="Sheet1",
+            file_path="C:\\data\\report.xlsx",
+        )
+    mock_push.assert_called_once_with(
+        mock_spreadsheet, "Sheet1", Path("C:\\data\\report.xlsx"), "xlsx"
+    )
+    assert "Sheet1" in result
+
+
+def test_push_all_calls_sync_and_returns_message():
+    mock_spreadsheet = MagicMock()
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_spreadsheet), \
+         patch("gssync.mcp_server._push_all") as mock_push_all:
+        result = push_all(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            file_path="C:\\data\\report.xlsx",
+        )
+    mock_push_all.assert_called_once()
+    assert "C:\\data\\report.xlsx" in result
