@@ -19,7 +19,7 @@ def read_xlsx(path: Path) -> SheetData:
 
 def write_xlsx(path: Path, data: SheetData) -> None:
     wb = openpyxl.load_workbook(path) if path.exists() else openpyxl.Workbook()
-    if not path.exists() and "Sheet" in wb.sheetnames:
+    if not path.exists() and wb.sheetnames == ["Sheet"]:
         del wb["Sheet"]
     for name, rows in data.items():
         if name in wb.sheetnames:

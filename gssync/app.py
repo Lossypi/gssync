@@ -108,8 +108,8 @@ class MainScreen(Screen):
         self._load_sheets()
 
     @work(exclusive=True, thread=True)
-    def _load_sheets(self) -> None:
-        self._set_status_threaded("Connecting to Google Sheets…")
+    def _load_sheets(self, done_message: str = "Ready.") -> None:
+        self._set_status_threaded("Refreshing…")
         try:
             client = get_client()
             self._spreadsheet = open_spreadsheet(client, self._config.spreadsheet_url)
@@ -122,7 +122,7 @@ class MainScreen(Screen):
         local_names = list_local_sheets(Path(self._config.file_path), self._config.file_format)
 
         self.call_from_thread(self._populate_lists, google_names, local_names)
-        self._set_status_threaded("Ready.")
+        self._set_status_threaded(done_message)
 
     def _populate_lists(self, google_names: list, local_names: list) -> None:
         gl = self.query_one("#google-list", ListView)
@@ -169,10 +169,9 @@ class MainScreen(Screen):
         self._set_status_threaded(f"Pulling '{name}'…")
         try:
             pull_sheet(self._spreadsheet, name, Path(self._config.file_path), self._config.file_format)
-            self._set_status_threaded(f"✓ Pulled '{name}' successfully.")
+            self._load_sheets(done_message=f"✓ Pulled '{name}' successfully.")
         except Exception as e:
             self._set_status_threaded(f"Error: {e}", error=True)
-        self._load_sheets()
 
     def action_push_sheet(self) -> None:
         name = self._active_selected_name()
@@ -185,10 +184,9 @@ class MainScreen(Screen):
         self._set_status_threaded(f"Pushing '{name}'…")
         try:
             push_sheet(self._spreadsheet, name, Path(self._config.file_path), self._config.file_format)
-            self._set_status_threaded(f"✓ Pushed '{name}' successfully.")
+            self._load_sheets(done_message=f"✓ Pushed '{name}' successfully.")
         except Exception as e:
             self._set_status_threaded(f"Error: {e}", error=True)
-        self._load_sheets()
 
     @work(exclusive=True, thread=True)
     def action_pull_all(self) -> None:
@@ -197,10 +195,9 @@ class MainScreen(Screen):
         self._set_status_threaded("Pulling all sheets…")
         try:
             pull_all(self._spreadsheet, Path(self._config.file_path), self._config.file_format)
-            self._set_status_threaded("Pulled all sheets successfully.")
+            self._load_sheets(done_message="Pulled all sheets successfully.")
         except Exception as e:
             self._set_status_threaded(f"Error: {e}", error=True)
-        self._load_sheets()
 
     @work(exclusive=True, thread=True)
     def action_push_all(self) -> None:
@@ -209,10 +206,9 @@ class MainScreen(Screen):
         self._set_status_threaded("Pushing all sheets…")
         try:
             push_all(self._spreadsheet, Path(self._config.file_path), self._config.file_format)
-            self._set_status_threaded("Pushed all sheets successfully.")
+            self._load_sheets(done_message="Pushed all sheets successfully.")
         except Exception as e:
             self._set_status_threaded(f"Error: {e}", error=True)
-        self._load_sheets()
 
     def action_change_format(self) -> None:
         formats = ["xlsx", "json", "csv"]
