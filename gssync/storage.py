@@ -8,12 +8,18 @@ import openpyxl
 SheetData = Dict[str, List[List]]
 
 
+def _normalize_xlsx_cell(value: object) -> object:
+    if isinstance(value, (str, int, float, type(None))):
+        return value
+    return str(value)
+
+
 def read_xlsx(path: Path) -> SheetData:
     wb = openpyxl.load_workbook(path)
     result = {}
     for name in wb.sheetnames:
         ws = wb[name]
-        result[name] = [[cell.value for cell in row] for row in ws.iter_rows()]
+        result[name] = [[_normalize_xlsx_cell(cell.value) for cell in row] for row in ws.iter_rows()]
     return result
 
 
