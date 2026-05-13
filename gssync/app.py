@@ -130,9 +130,9 @@ class MainScreen(Screen):
         gl.clear()
         ll.clear()
         for name in google_names:
-            gl.append(ListItem(Label(name)))
+            gl.append(ListItem(Label(name), name=name))
         for name in local_names:
-            ll.append(ListItem(Label(name)))
+            ll.append(ListItem(Label(name), name=name))
 
     def _set_status(self, msg: str, error: bool = False) -> None:
         status = self.query_one("#status", Static)
@@ -147,8 +147,7 @@ class MainScreen(Screen):
         lv = self.query_one(list_id, ListView)
         if lv.highlighted_child is None:
             return None
-        label = lv.highlighted_child.query_one(Label)
-        return str(label.renderable)
+        return lv.highlighted_child.name
 
     def action_switch_panel(self) -> None:
         self._active_panel = "local" if self._active_panel == "google" else "google"
