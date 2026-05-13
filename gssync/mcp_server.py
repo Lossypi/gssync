@@ -41,5 +41,21 @@ def set_config(
     )
 
 
+@mcp.tool()
+def list_google_sheets(spreadsheet_url: str) -> str:
+    client = get_client()
+    spreadsheet = open_spreadsheet(client, spreadsheet_url)
+    names = list_sheet_names(spreadsheet)
+    return f"Sheets: {', '.join(names)}"
+
+
+@mcp.tool()
+def list_local_sheets(file_path: str, file_format: str = "xlsx") -> str:
+    names = _list_local_sheets(Path(file_path), file_format)
+    if not names:
+        return f"No sheets found in {file_path}"
+    return f"Sheets: {', '.join(names)}"
+
+
 if __name__ == "__main__":
     mcp.run()
