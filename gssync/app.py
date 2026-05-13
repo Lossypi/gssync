@@ -109,20 +109,20 @@ class MainScreen(Screen):
 
     @work(exclusive=True, thread=True)
     def _load_sheets(self) -> None:
-        self._set_status("Connecting to Google Sheets…")
+        self._set_status_threaded("Connecting to Google Sheets…")
         try:
             client = get_client()
             self._spreadsheet = open_spreadsheet(client, self._config.spreadsheet_url)
             google_names = list_sheet_names(self._spreadsheet)
         except Exception as e:
-            self._set_status(f"Error: {e}", error=True)
+            self._set_status_threaded(f"Error: {e}", error=True)
             return
 
         from .storage import list_local_sheets
         local_names = list_local_sheets(Path(self._config.file_path), self._config.file_format)
 
         self.call_from_thread(self._populate_lists, google_names, local_names)
-        self._set_status("Ready.")
+        self._set_status_threaded("Ready.")
 
     def _populate_lists(self, google_names: list, local_names: list) -> None:
         gl = self.query_one("#google-list", ListView)
@@ -135,11 +135,12 @@ class MainScreen(Screen):
             ll.append(ListItem(Label(name)))
 
     def _set_status(self, msg: str, error: bool = False) -> None:
-        def _update():
-            status = self.query_one("#status", Static)
-            status.update(msg)
-            status.set_class(error, "error")
-        self.call_from_thread(_update)
+        status = self.query_one("#status", Static)
+        status.update(msg)
+        status.set_class(error, "error")
+
+    def _set_status_threaded(self, msg: str, error: bool = False) -> None:
+        self.call_from_thread(self._set_status, msg, error)
 
     def _active_selected_name(self) -> Optional[str]:
         list_id = "#google-list" if self._active_panel == "google" else "#local-list"
@@ -157,54 +158,61 @@ class MainScreen(Screen):
     def action_refresh(self) -> None:
         self._load_sheets()
 
-    @work(exclusive=True, thread=True)
     def action_pull_sheet(self) -> None:
         name = self._active_selected_name()
         if not name or not self._spreadsheet:
             return
-        self._set_status(f"Pulling '{name}'…")
-        try:
-            pull_sheet(self._spreadsheet, name, Path(self._config.file_path), self._config.file_format)
-            self._set_status(f"Pulled '{name}' successfully.")
-        except Exception as e:
-            self._set_status(f"Error: {e}", error=True)
-        self._load_sheets()
+        self._do_pull_sheet(name)
 
     @work(exclusive=True, thread=True)
+    def _do_pull_sheet(self, name: str) -> None:
+        self._set_status_threaded(f"Pulling '{name}'…")
+        try:
+            pull_sheet(self._spreadsheet, name, Path(self._config.file_path), self._config.file_format)
+            self._set_status_threaded(f"✓ Pulled '{name}' successfully.")
+        except Exception as e:
+            self._set_status_threaded(f"Error: {e}", error=True)
+        self._load_sheets()
+
     def action_push_sheet(self) -> None:
         name = self._active_selected_name()
         if not name or not self._spreadsheet:
             return
-        self._set_status(f"Pushing '{name}'…")
+        self._do_push_sheet(name)
+
+    @work(exclusive=True, thread=True)
+    def _do_push_sheet(self, name: str) -> None:
+        self._set_status_threaded(f"Pushing '{name}'…")
         try:
             push_sheet(self._spreadsheet, name, Path(self._config.file_path), self._config.file_format)
-            self._set_status(f"Pushed '{name}' successfully.")
+            self._set_status_threaded(f"✓ Pushed '{name}' successfully.")
         except Exception as e:
-            self._set_status(f"Error: {e}", error=True)
+            self._set_status_threaded(f"Error: {e}", error=True)
         self._load_sheets()
 
     @work(exclusive=True, thread=True)
     def action_pull_all(self) -> None:
         if not self._spreadsheet:
             return
-        self._set_status("Pulling all sheets…")
+        self._set_status_threaded("Pulling all sheets…")
         try:
             pull_all(self._spreadsheet, Path(self._config.file_path), self._config.file_format)
-            self._set_status("Pulled all sheets successfully.")
+            self._set_status_threaded("Pulled all sheets successfully.")
         except Exception as e:
-            self._set_status(f"Error: {e}", error=True)
+            self._set_status_threaded(f"Error: {e}", error=True)
         self._load_sheets()
 
     @work(exclusive=True, thread=True)
     def action_push_all(self) -> None:
         if not self._spreadsheet:
             return
-        self._set_status("Pushing all sheets…")
+        self._set_status_threaded("Pushing all sheets…")
         try:
             push_all(self._spreadsheet, Path(self._config.file_path), self._config.file_format)
-            self._set_status("Pushed all sheets successfully.")
+            self._set_status_threaded("Pushed all sheets successfully.")
         except Exception as e:
-            self._set_status(f"Error: {e}", error=True)
+            self._set_status_threaded(f"Error: {e}", error=True)
+        self._load_sheets()
 
     def action_change_format(self) -> None:
         formats = ["xlsx", "json", "csv"]
