@@ -35,7 +35,7 @@ def list_sheet_names(spreadsheet: gspread.Spreadsheet) -> List[str]:
 
 
 def read_sheet(spreadsheet: gspread.Spreadsheet, name: str) -> List[List]:
-    return spreadsheet.worksheet(name).get_all_values()
+    return spreadsheet.worksheet(name).get_all_values(value_render_option="FORMATTED_VALUE")
 
 
 def write_sheet(spreadsheet: gspread.Spreadsheet, name: str, data: List[List]) -> None:
