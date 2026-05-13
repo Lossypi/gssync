@@ -11,6 +11,9 @@ SheetData = Dict[str, List[List]]
 def _normalize_xlsx_cell(value: object) -> object:
     if isinstance(value, (str, int, float, type(None))):
         return value
+    from openpyxl.worksheet.formula import ArrayFormula
+    if isinstance(value, ArrayFormula):
+        return value.text
     return str(value)
 
 
