@@ -121,7 +121,7 @@ class MainScreen(Screen):
         from .storage import list_local_sheets
         local_names = list_local_sheets(Path(self._config.file_path), self._config.file_format)
 
-        self.call_from_thread(self._populate_lists, google_names, local_names)
+        self.app.call_from_thread(self._populate_lists, google_names, local_names)
         self._set_status_threaded(done_message)
 
     def _populate_lists(self, google_names: list, local_names: list) -> None:
@@ -140,7 +140,7 @@ class MainScreen(Screen):
         status.set_class(error, "error")
 
     def _set_status_threaded(self, msg: str, error: bool = False) -> None:
-        self.call_from_thread(self._set_status, msg, error)
+        self.app.call_from_thread(self._set_status, msg, error)
 
     def _active_selected_name(self) -> Optional[str]:
         list_id = "#google-list" if self._active_panel == "google" else "#local-list"
