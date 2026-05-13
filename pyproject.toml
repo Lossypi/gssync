@@ -1,0 +1,21 @@
+﻿[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gssync"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "gspread>=6.0",
+    "google-auth-oauthlib>=1.2",
+    "openpyxl>=3.1",
+    "textual>=0.60",
+]
+
+[project.scripts]
+gssync = "gssync.__main__:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
