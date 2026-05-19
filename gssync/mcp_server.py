@@ -182,7 +182,7 @@ def update_rows(
         return f"Updated {count} row(s) in '{sheet_name}' at {cell_range}"
     all_rows = ws.get_all_values(value_render_option="FORMULA")
     header = all_rows[0] if all_rows else []
-    indices = resolve_filter(all_rows, row_numbers, filter_column, filter_value)
+    indices = resolve_filter(all_rows, row_numbers, filter_column, filter_value, cell_range)
     new_rows = rows_data_to_lists(rows_data, header)
     if filter_column:
         # Broadcast: apply first entry to all matching rows
