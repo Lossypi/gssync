@@ -54,7 +54,8 @@ def parse_cell_range(cell_range: str) -> Tuple[int, int, int, int]:
 def filter_rows_by_column(
     data_rows: List[List], header: List, column: str, value: str
 ) -> List[int]:
-    """Return 1-based data row indices where header[column] == value."""
+    """Return 1-based data row indices where header[column] == value.
+    Rows shorter than the target column index are silently skipped."""
     if column not in header:
         raise ValueError(f"Column '{column}' not found in sheet")
     col_idx = header.index(column)
@@ -156,8 +157,10 @@ def write_rows_to_sheet(
     ws = spreadsheet.worksheet(sheet_name)
     count = 0
     for idx, row in zip(indices, rows):
+        if not row:
+            continue
         sheet_row = idx + 1  # +1 because row 1 is the header
-        end_col = _col_index_to_letter(max(len(row), 1))
+        end_col = _col_index_to_letter(len(row))
         ws.update(
             f"A{sheet_row}:{end_col}{sheet_row}",
             [row],

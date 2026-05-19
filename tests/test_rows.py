@@ -79,6 +79,13 @@ def test_filter_rows_by_column_missing_column():
     with pytest.raises(ValueError, match="Column 'missing'"):
         filter_rows_by_column([], ["name"], "missing", "x")
 
+def test_filter_rows_by_column_short_row_skipped():
+    header = ["name", "status", "amount"]
+    rows = [["Ivan", "active"], ["Maria", "active", "100"]]  # first row lacks 'amount'
+    # Both should match on 'status' column (index 1), which is present in both
+    result = filter_rows_by_column(rows, header, "status", "active")
+    assert result == [1, 2]
+
 
 # ── resolve_filter ───────────────────────────────────────────────────────────
 
@@ -103,6 +110,9 @@ def test_resolve_filter_multiple_filters():
 def test_resolve_filter_cell_range_row1_raises():
     with pytest.raises(ValueError, match="row 2 or later"):
         resolve_filter([], cell_range="A1:D5")
+
+def test_resolve_filter_cell_range_single_row():
+    assert resolve_filter([], cell_range="A2:D2") == [1]
 
 
 # ── rows_data_to_lists ───────────────────────────────────────────────────────
@@ -191,6 +201,16 @@ def test_write_rows_to_sheet_mismatched_lengths_raises():
     mock_ss = MagicMock()
     with pytest.raises(ValueError, match="same length"):
         write_rows_to_sheet(mock_ss, "Sheet1", [1, 2], [["only one row"]])
+
+def test_write_rows_to_sheet_skips_empty_row():
+    mock_ws = MagicMock()
+    mock_ss = MagicMock()
+    mock_ss.worksheet.return_value = mock_ws
+    count = write_rows_to_sheet(mock_ss, "Sheet1", [1, 2], [[], ["Ivan", "done"]])
+    assert count == 1  # empty row skipped
+    mock_ws.update.assert_called_once_with(
+        "A3:B3", [["Ivan", "done"]], value_input_option="USER_ENTERED"
+    )
 
 
 # ── write_range_to_sheet ─────────────────────────────────────────────────────
