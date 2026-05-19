@@ -92,6 +92,10 @@ def resolve_filter(
         return filter_rows_by_column(data, header, filter_column, filter_value)
     # cell_range: convert sheet rows to 1-based data row indices (subtract 1 for header)
     row_start, row_end, _, _ = parse_cell_range(cell_range)
+    if row_start < 2:
+        raise ValueError(
+            "cell_range must start at row 2 or later (row 1 is the header)"
+        )
     return list(range(row_start - 1, row_end))
 
 
@@ -145,6 +149,10 @@ def write_rows_to_sheet(
     """Write rows to specific data positions in GS.
     indices are 1-based data row numbers (row 1 = first row after header, i.e. sheet row 2).
     Returns count of rows written."""
+    if len(indices) != len(rows):
+        raise ValueError(
+            f"indices and rows must have the same length (got {len(indices)} and {len(rows)})"
+        )
     ws = spreadsheet.worksheet(sheet_name)
     count = 0
     for idx, row in zip(indices, rows):

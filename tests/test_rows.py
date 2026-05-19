@@ -1,6 +1,6 @@
 import pytest
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from gssync.rows import (
     _col_index_to_letter,
@@ -8,10 +8,12 @@ from gssync.rows import (
     filter_rows_by_column,
     parse_cell_range,
     parse_row_numbers,
+    read_range_from_sheet,
     read_rows_from_local,
     read_rows_from_sheet,
     resolve_filter,
     rows_data_to_lists,
+    write_range_to_sheet,
     write_rows_to_sheet,
 )
 
@@ -98,6 +100,10 @@ def test_resolve_filter_multiple_filters():
     with pytest.raises(ValueError, match="Provide exactly one filter"):
         resolve_filter([], row_numbers="1", cell_range="A2:B3")
 
+def test_resolve_filter_cell_range_row1_raises():
+    with pytest.raises(ValueError, match="row 2 or later"):
+        resolve_filter([], cell_range="A1:D5")
+
 
 # ── rows_data_to_lists ───────────────────────────────────────────────────────
 
@@ -154,6 +160,21 @@ def test_read_rows_from_sheet_out_of_bounds_skipped():
     assert rows == [["Ivan"]]
 
 
+# ── read_range_from_sheet ────────────────────────────────────────────────────
+
+def test_read_range_from_sheet_returns_header_and_rows():
+    mock_ws = MagicMock()
+    mock_ws.row_values.return_value = ["name", "status"]
+    mock_ws.get.return_value = [["Ivan", "active"], ["Maria", "done"]]
+    mock_ss = MagicMock()
+    mock_ss.worksheet.return_value = mock_ws
+    header, rows = read_range_from_sheet(mock_ss, "Sheet1", "A2:B3")
+    mock_ws.row_values.assert_called_once_with(1)
+    mock_ws.get.assert_called_once_with("A2:B3", value_render_option="FORMULA")
+    assert header == ["name", "status"]
+    assert rows == [["Ivan", "active"], ["Maria", "done"]]
+
+
 # ── write_rows_to_sheet ──────────────────────────────────────────────────────
 
 def test_write_rows_to_sheet_calls_update():
@@ -164,6 +185,24 @@ def test_write_rows_to_sheet_calls_update():
     assert count == 1
     mock_ws.update.assert_called_once_with(
         "A3:B3", [["Ivan", "done"]], value_input_option="USER_ENTERED"
+    )
+
+def test_write_rows_to_sheet_mismatched_lengths_raises():
+    mock_ss = MagicMock()
+    with pytest.raises(ValueError, match="same length"):
+        write_rows_to_sheet(mock_ss, "Sheet1", [1, 2], [["only one row"]])
+
+
+# ── write_range_to_sheet ─────────────────────────────────────────────────────
+
+def test_write_range_to_sheet_calls_update():
+    mock_ws = MagicMock()
+    mock_ss = MagicMock()
+    mock_ss.worksheet.return_value = mock_ws
+    count = write_range_to_sheet(mock_ss, "Sheet1", "B2:C3", [["x", "y"], ["a", "b"]])
+    assert count == 2
+    mock_ws.update.assert_called_once_with(
+        "B2:C3", [["x", "y"], ["a", "b"]], value_input_option="USER_ENTERED"
     )
 
 
