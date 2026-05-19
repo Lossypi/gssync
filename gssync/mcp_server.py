@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from fastmcp import FastMCP
@@ -150,7 +151,12 @@ def get_rows(
     else:
         all_rows = ws.get_all_values(value_render_option="FORMULA")
         indices = resolve_filter(all_rows, row_numbers, filter_column, filter_value, cell_range)
-        header, rows = read_rows_from_sheet(spreadsheet, sheet_name, indices)
+        if not all_rows:
+            header, rows = [], []
+        else:
+            header = all_rows[0]
+            data_rows = all_rows[1:]
+            rows = [data_rows[i - 1] for i in indices if 1 <= i <= len(data_rows)]
     if not rows:
         return f"No rows found in '{sheet_name}'"
     return f"Sheet: {sheet_name} | {len(rows)} row(s)\n{_format_rows_table(header, rows)}"
@@ -166,13 +172,12 @@ def update_rows(
     filter_value: str = "",
     cell_range: str = "",
 ) -> str:
-    import json as _json
     client = get_client()
     spreadsheet = open_spreadsheet(client, spreadsheet_url)
     ws = spreadsheet.worksheet(sheet_name)
     if cell_range and not row_numbers and not filter_column:
         # Direct range write — rows_data is a JSON array of arrays
-        data = _json.loads(rows_data)
+        data = json.loads(rows_data)
         count = write_range_to_sheet(spreadsheet, sheet_name, cell_range, data)
         return f"Updated {count} row(s) in '{sheet_name}' at {cell_range}"
     all_rows = ws.get_all_values(value_render_option="FORMULA")
@@ -182,7 +187,7 @@ def update_rows(
     if filter_column:
         # Broadcast: apply first entry to all matching rows
         broadcast = new_rows[0] if new_rows else []
-        write_data = [broadcast] * len(indices)
+        write_data = [list(broadcast) for _ in range(len(indices))]
     else:
         write_data = new_rows
     count = write_rows_to_sheet(spreadsheet, sheet_name, indices, write_data)
@@ -206,7 +211,12 @@ def pull_rows(
     ws = spreadsheet.worksheet(sheet_name)
     all_rows = ws.get_all_values(value_render_option="FORMULA")
     indices = resolve_filter(all_rows, row_numbers, filter_column, filter_value, cell_range)
-    header, rows = read_rows_from_sheet(spreadsheet, sheet_name, indices)
+    if not all_rows:
+        header, rows = [], []
+    else:
+        header = all_rows[0]
+        data_rows = all_rows[1:]
+        rows = [data_rows[i - 1] for i in indices if 1 <= i <= len(data_rows)]
     path = Path(file_path)
     exists = (path.exists() and path.is_dir()) if file_format == "csv" else path.exists()
     existing = read_local(path, file_format) if exists else {}
