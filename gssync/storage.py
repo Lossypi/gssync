@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import openpyxl
+from openpyxl.utils import get_column_letter, column_index_from_string
 
 SheetData = Dict[str, List[List]]
 
@@ -91,3 +92,44 @@ def list_local_sheets(path: Path, fmt: str) -> List[str]:
     if not exists:
         return []
     return list(read_local(path, fmt).keys())
+
+
+def read_xlsx_formatting(path: Path, sheet_name: str):
+    from .formatting import (
+        openpyxl_cell_to_ir, char_width_to_px, points_to_px, SheetFormatting,
+    )
+    wb = openpyxl.load_workbook(path)
+    if sheet_name not in wb.sheetnames:
+        return SheetFormatting()
+    ws = wb[sheet_name]
+    sf = SheetFormatting()
+    for row in ws.iter_rows():
+        for cell in row:
+            # Skip cells that were never explicitly styled. openpyxl hands every
+            # cell a default Font(Calibri, 11), so without this guard every blank
+            # cell would be captured and pushed to GS.
+            if not cell.has_style:
+                continue
+            cf = openpyxl_cell_to_ir(cell)
+            if not cf.is_empty():
+                sf.cells[(cell.row - 1, cell.column - 1)] = cf
+    for letter, dim in ws.column_dimensions.items():
+        if dim.width is not None:
+            sf.column_widths[column_index_from_string(letter) - 1] = char_width_to_px(dim.width)
+    for idx, dim in ws.row_dimensions.items():
+        if dim.height is not None:
+            sf.row_heights[idx - 1] = points_to_px(dim.height)
+    return sf
+
+
+def apply_formatting_to_xlsx(path: Path, sheet_name: str, sf) -> None:
+    from .formatting import apply_ir_to_openpyxl_cell, px_to_char_width, px_to_points
+    wb = openpyxl.load_workbook(path)
+    ws = wb[sheet_name]
+    for (r, c), cf in sf.cells.items():
+        apply_ir_to_openpyxl_cell(ws.cell(row=r + 1, column=c + 1), cf)
+    for col, px in sf.column_widths.items():
+        ws.column_dimensions[get_column_letter(col + 1)].width = px_to_char_width(px)
+    for row, px in sf.row_heights.items():
+        ws.row_dimensions[row + 1].height = px_to_points(px)
+    wb.save(path)

@@ -55,3 +55,29 @@ def write_sheet(spreadsheet: gspread.Spreadsheet, name: str, data: List[List]) -
     ws.clear()
     if data:
         ws.update(data, value_input_option="USER_ENTERED")
+
+
+def read_sheet_formatting(spreadsheet: gspread.Spreadsheet, name: str):
+    from .formatting import gs_grid_to_sheet_formatting, SheetFormatting
+    fields = (
+        "sheets(properties(sheetId,title),"
+        "data(rowData(values(userEnteredFormat)),"
+        "columnMetadata(pixelSize),rowMetadata(pixelSize)))"
+    )
+    meta = spreadsheet.fetch_sheet_metadata(params={
+        "includeGridData": True,
+        "ranges": [name],
+        "fields": fields,
+    })
+    for sheet in meta.get("sheets", []):
+        if sheet.get("properties", {}).get("title") == name:
+            return gs_grid_to_sheet_formatting(sheet)
+    return SheetFormatting()
+
+
+def write_sheet_formatting(spreadsheet: gspread.Spreadsheet, name: str, sf) -> None:
+    from .formatting import ir_to_gs_requests
+    sheet_id = spreadsheet.worksheet(name).id
+    requests = ir_to_gs_requests(sheet_id, sf)
+    if requests:
+        spreadsheet.batch_update({"requests": requests})
