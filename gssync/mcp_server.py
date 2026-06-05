@@ -17,6 +17,9 @@ from .rows import (
     write_range_to_sheet,
     write_rows_to_sheet,
 )
+from .rows import remap_formatting_rows
+from .sheets import read_sheet_formatting, write_sheet_formatting
+from .storage import apply_formatting_to_xlsx, read_xlsx_formatting
 
 mcp = FastMCP("GSSync")
 
@@ -73,10 +76,12 @@ def pull_sheet(
     sheet_name: str,
     file_path: str,
     file_format: str = "xlsx",
+    include_formatting: bool = True,
 ) -> str:
     client = get_client()
     spreadsheet = open_spreadsheet(client, spreadsheet_url)
-    _pull_sheet(spreadsheet, sheet_name, Path(file_path), file_format)
+    _pull_sheet(spreadsheet, sheet_name, Path(file_path), file_format,
+                include_formatting=include_formatting)
     return f"Pulled '{sheet_name}' from {spreadsheet_url} → {file_path}"
 
 
@@ -85,11 +90,13 @@ def pull_all(
     spreadsheet_url: str,
     file_path: str,
     file_format: str = "xlsx",
+    include_formatting: bool = True,
 ) -> str:
     client = get_client()
     spreadsheet = open_spreadsheet(client, spreadsheet_url)
     names = list_sheet_names(spreadsheet)
-    _pull_all(spreadsheet, Path(file_path), file_format)
+    _pull_all(spreadsheet, Path(file_path), file_format,
+              include_formatting=include_formatting)
     return f"Pulled {len(names)} sheets from {spreadsheet_url} → {file_path}"
 
 
@@ -99,10 +106,12 @@ def push_sheet(
     sheet_name: str,
     file_path: str,
     file_format: str = "xlsx",
+    include_formatting: bool = True,
 ) -> str:
     client = get_client()
     spreadsheet = open_spreadsheet(client, spreadsheet_url)
-    _push_sheet(spreadsheet, sheet_name, Path(file_path), file_format)
+    _push_sheet(spreadsheet, sheet_name, Path(file_path), file_format,
+                include_formatting=include_formatting)
     return f"Pushed '{sheet_name}' from {file_path} → {spreadsheet_url}"
 
 
@@ -111,10 +120,12 @@ def push_all(
     spreadsheet_url: str,
     file_path: str,
     file_format: str = "xlsx",
+    include_formatting: bool = True,
 ) -> str:
     client = get_client()
     spreadsheet = open_spreadsheet(client, spreadsheet_url)
-    _push_all(spreadsheet, Path(file_path), file_format)
+    _push_all(spreadsheet, Path(file_path), file_format,
+              include_formatting=include_formatting)
     return f"Pushed all sheets from {file_path} → {spreadsheet_url}"
 
 
@@ -204,6 +215,7 @@ def pull_rows(
     filter_column: str = "",
     filter_value: str = "",
     cell_range: str = "",
+    include_formatting: bool = True,
 ) -> str:
     from .storage import read_local, write_local
     client = get_client()
@@ -222,7 +234,17 @@ def pull_rows(
     existing = read_local(path, file_format) if exists else {}
     existing[sheet_name] = [header] + rows
     write_local(path, file_format, existing)
-    return f"Pulled {len(rows)} row(s) from '{sheet_name}' → {file_path}"
+    note = ""
+    if include_formatting and file_format == "xlsx":
+        valid = [i for i in indices if 1 <= i <= len(all_rows) - 1]
+        row_map = {0: 0}
+        for k, i in enumerate(valid, start=1):
+            row_map[i] = k  # 0-based GS row i -> file row k
+        sf = read_sheet_formatting(spreadsheet, sheet_name)
+        apply_formatting_to_xlsx(path, sheet_name, remap_formatting_rows(sf, row_map))
+    elif include_formatting and file_format != "xlsx":
+        note = " (formatting skipped: only xlsx supports it)"
+    return f"Pulled {len(rows)} row(s) from '{sheet_name}' → {file_path}{note}"
 
 
 @mcp.tool()
@@ -235,6 +257,7 @@ def push_rows(
     filter_column: str = "",
     filter_value: str = "",
     cell_range: str = "",
+    include_formatting: bool = True,
 ) -> str:
     from .storage import read_local
     client = get_client()
@@ -245,7 +268,15 @@ def push_rows(
     indices = resolve_filter(all_rows, row_numbers, filter_column, filter_value, cell_range)
     _, rows = read_rows_from_local(path, file_format, sheet_name, indices)
     count = write_rows_to_sheet(spreadsheet, sheet_name, indices, rows)
-    return f"Pushed {count} row(s) from {file_path} → '{sheet_name}'"
+    note = ""
+    if include_formatting and file_format == "xlsx":
+        row_map = {i: i for i in indices}  # 0-based row identity (file == GS)
+        sf = read_xlsx_formatting(path, sheet_name)
+        write_sheet_formatting(spreadsheet, sheet_name,
+                               remap_formatting_rows(sf, row_map))
+    elif include_formatting and file_format != "xlsx":
+        note = " (formatting skipped: only xlsx supports it)"
+    return f"Pushed {count} row(s) from {file_path} → '{sheet_name}'{note}"
 
 
 if __name__ == "__main__":

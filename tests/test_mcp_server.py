@@ -89,7 +89,8 @@ def test_pull_sheet_calls_sync_and_returns_message():
             file_path="C:\\data\\report.xlsx",
         )
     mock_pull.assert_called_once_with(
-        mock_spreadsheet, "Sheet1", Path("C:\\data\\report.xlsx"), "xlsx"
+        mock_spreadsheet, "Sheet1", Path("C:\\data\\report.xlsx"), "xlsx",
+        include_formatting=True,
     )
     assert "Sheet1" in result
     assert "C:\\data\\report.xlsx" in result
@@ -120,7 +121,8 @@ def test_push_sheet_calls_sync_and_returns_message():
             file_path="C:\\data\\report.xlsx",
         )
     mock_push.assert_called_once_with(
-        mock_spreadsheet, "Sheet1", Path("C:\\data\\report.xlsx"), "xlsx"
+        mock_spreadsheet, "Sheet1", Path("C:\\data\\report.xlsx"), "xlsx",
+        include_formatting=True,
     )
     assert "Sheet1" in result
 
@@ -239,6 +241,7 @@ def test_pull_rows_writes_filtered_rows_to_file(tmp_path):
             sheet_name="Sheet1",
             file_path=str(xlsx),
             row_numbers="1",
+            include_formatting=False,
         )
     from gssync.storage import read_local
     data = read_local(xlsx, "xlsx")
@@ -264,8 +267,112 @@ def test_push_rows_from_local_file(tmp_path):
             sheet_name="Sheet1",
             file_path=str(xlsx),
             row_numbers="2",
+            include_formatting=False,
         )
     mock_ws.update.assert_called_once_with(
         "A3:B3", [["Maria", "done"]], value_input_option="USER_ENTERED"
     )
     assert "1" in result
+
+
+# ── include_formatting ─────────────────────────────────────────────────────────
+
+def test_pull_sheet_passes_include_formatting():
+    mock_spreadsheet = MagicMock()
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_spreadsheet), \
+         patch("gssync.mcp_server._pull_sheet") as mock_pull:
+        pull_sheet(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            sheet_name="Sheet1",
+            file_path="C:\\data\\report.xlsx",
+            include_formatting=False,
+        )
+    assert mock_pull.call_args.kwargs["include_formatting"] is False
+
+
+def test_push_sheet_passes_include_formatting():
+    mock_spreadsheet = MagicMock()
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_spreadsheet), \
+         patch("gssync.mcp_server._push_sheet") as mock_push:
+        push_sheet(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            sheet_name="Sheet1",
+            file_path="C:\\data\\report.xlsx",
+        )
+    assert mock_push.call_args.kwargs["include_formatting"] is True
+
+
+def test_pull_rows_applies_formatting_for_xlsx(tmp_path):
+    mock_ws = MagicMock()
+    mock_ws.get_all_values.return_value = [
+        ["name", "status"], ["Ivan", "active"], ["Maria", "done"],
+    ]
+    mock_ss = MagicMock()
+    mock_ss.worksheet.return_value = mock_ws
+    xlsx = tmp_path / "data.xlsx"
+    from gssync.formatting import SheetFormatting, CellFormat
+    sf = SheetFormatting(cells={(0, 0): CellFormat(bold=True), (1, 0): CellFormat(italic=True)})
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_ss), \
+         patch("gssync.mcp_server.read_sheet_formatting", return_value=sf), \
+         patch("gssync.mcp_server.apply_formatting_to_xlsx") as mock_apply:
+        pull_rows(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            sheet_name="Sheet1",
+            file_path=str(xlsx),
+            row_numbers="1",
+            include_formatting=True,
+        )
+    mock_apply.assert_called_once()
+    remapped = mock_apply.call_args[0][2]
+    # header row 0 -> file row 0; data row idx=1 (0-based sheet row 1) -> file row 1
+    assert (0, 0) in remapped.cells
+    assert (1, 0) in remapped.cells
+
+
+def test_push_rows_writes_formatting_for_xlsx(tmp_path):
+    from gssync.storage import write_local
+    xlsx = tmp_path / "data.xlsx"
+    write_local(xlsx, "xlsx", {"Sheet1": [["name", "status"], ["Ivan", "active"], ["Maria", "done"]]})
+    mock_ws = MagicMock()
+    mock_ss = MagicMock()
+    mock_ss.worksheet.return_value = mock_ws
+    from gssync.formatting import SheetFormatting, CellFormat
+    sf = SheetFormatting(cells={(2, 0): CellFormat(bold=True)})
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_ss), \
+         patch("gssync.mcp_server.read_xlsx_formatting", return_value=sf), \
+         patch("gssync.mcp_server.write_sheet_formatting") as mock_write_fmt:
+        push_rows(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            sheet_name="Sheet1",
+            file_path=str(xlsx),
+            row_numbers="2",
+            include_formatting=True,
+        )
+    mock_write_fmt.assert_called_once()
+    remapped = mock_write_fmt.call_args[0][2]
+    # data row idx=2 -> 0-based row 2 on both sides (identity)
+    assert (2, 0) in remapped.cells
+
+
+def test_pull_rows_skips_formatting_for_csv(tmp_path):
+    mock_ws = MagicMock()
+    mock_ws.get_all_values.return_value = [["name"], ["Ivan"]]
+    mock_ss = MagicMock()
+    mock_ss.worksheet.return_value = mock_ws
+    out_dir = tmp_path / "out"
+    with patch("gssync.mcp_server.get_client"), \
+         patch("gssync.mcp_server.open_spreadsheet", return_value=mock_ss), \
+         patch("gssync.mcp_server.read_sheet_formatting") as mock_read_fmt:
+        pull_rows(
+            spreadsheet_url="https://docs.google.com/spreadsheets/d/abc",
+            sheet_name="Sheet1",
+            file_path=str(out_dir),
+            file_format="csv",
+            row_numbers="1",
+            include_formatting=True,
+        )
+    mock_read_fmt.assert_not_called()
