@@ -197,3 +197,22 @@ def read_rows_from_local(
     data_rows = all_rows[1:]
     selected = [data_rows[i - 1] for i in indices if 1 <= i <= len(data_rows)]
     return header, selected
+
+
+def remap_formatting_rows(sf, row_map: dict):
+    """Remap a SheetFormatting onto new 0-based row positions.
+
+    row_map maps source 0-based row -> destination 0-based row. Cells and row
+    heights whose source row is in row_map are copied to the destination row;
+    everything else is dropped. Column widths are always dropped (a sheet-level
+    property that does not apply to a row subset).
+    """
+    from .formatting import SheetFormatting
+    out = SheetFormatting()
+    for (r, c), cf in sf.cells.items():
+        if r in row_map:
+            out.cells[(row_map[r], c)] = cf
+    for r, px in sf.row_heights.items():
+        if r in row_map:
+            out.row_heights[row_map[r]] = px
+    return out

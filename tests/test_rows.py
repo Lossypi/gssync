@@ -242,3 +242,28 @@ def test_read_rows_from_local_missing_sheet(tmp_path):
     write_local(xlsx, "xlsx", {"Sheet1": [["name"]]})
     with pytest.raises(ValueError, match="Sheet 'Missing'"):
         read_rows_from_local(xlsx, "xlsx", "Missing", [1])
+
+
+# ── remap_formatting_rows ──────────────────────────────────────────────────────
+
+from gssync.formatting import SheetFormatting, CellFormat
+from gssync.rows import remap_formatting_rows
+
+
+def test_remap_formatting_rows_remaps_cells_and_heights():
+    sf = SheetFormatting(
+        cells={(0, 0): CellFormat(bold=True), (3, 1): CellFormat(italic=True)},
+        column_widths={0: 100},
+        row_heights={0: 21, 3: 40},
+    )
+    out = remap_formatting_rows(sf, {0: 0, 3: 1})
+    assert out.cells[(0, 0)].bold is True
+    assert out.cells[(1, 1)].italic is True
+    assert out.row_heights == {0: 21, 1: 40}
+    assert out.column_widths == {}  # dropped
+
+
+def test_remap_formatting_rows_skips_unmapped():
+    sf = SheetFormatting(cells={(5, 0): CellFormat(bold=True)})
+    out = remap_formatting_rows(sf, {0: 0})
+    assert out.cells == {}

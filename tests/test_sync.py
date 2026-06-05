@@ -62,3 +62,45 @@ def test_push_all_pushes_each_sheet(tmp_path):
     with patch("gssync.sync.write_sheet") as mock_write:
         push_all(MagicMock(), path, "xlsx")
     assert mock_write.call_count == 2
+
+
+# ── include_formatting wiring ──────────────────────────────────────────────────
+
+def test_pull_sheet_applies_formatting_for_xlsx(tmp_path):
+    mock_ss = MagicMock()
+    xlsx = tmp_path / "data.xlsx"
+    with patch("gssync.sync.read_sheet", return_value=[["a", "b"], ["1", "2"]]), \
+         patch("gssync.sheets.read_sheet_formatting") as mock_read_fmt, \
+         patch("gssync.storage.apply_formatting_to_xlsx") as mock_apply:
+        pull_sheet(mock_ss, "Sheet1", xlsx, "xlsx", include_formatting=True)
+    mock_read_fmt.assert_called_once_with(mock_ss, "Sheet1")
+    mock_apply.assert_called_once()
+
+
+def test_pull_sheet_skips_formatting_for_csv(tmp_path):
+    mock_ss = MagicMock()
+    csv_dir = tmp_path / "out"
+    with patch("gssync.sync.read_sheet", return_value=[["a"]]), \
+         patch("gssync.sheets.read_sheet_formatting") as mock_read_fmt:
+        pull_sheet(mock_ss, "Sheet1", csv_dir, "csv", include_formatting=True)
+    mock_read_fmt.assert_not_called()
+
+
+def test_pull_sheet_skips_formatting_when_flag_off(tmp_path):
+    mock_ss = MagicMock()
+    xlsx = tmp_path / "data.xlsx"
+    with patch("gssync.sync.read_sheet", return_value=[["a"]]), \
+         patch("gssync.sheets.read_sheet_formatting") as mock_read_fmt:
+        pull_sheet(mock_ss, "Sheet1", xlsx, "xlsx", include_formatting=False)
+    mock_read_fmt.assert_not_called()
+
+
+def test_push_sheet_writes_formatting_for_xlsx(tmp_path):
+    from gssync.storage import write_local
+    mock_ss = MagicMock()
+    xlsx = tmp_path / "data.xlsx"
+    write_local(xlsx, "xlsx", {"Sheet1": [["a", "b"]]})
+    with patch("gssync.sheets.write_sheet_formatting") as mock_write_fmt, \
+         patch("gssync.storage.read_xlsx_formatting", return_value="SF"):
+        push_sheet(mock_ss, "Sheet1", xlsx, "xlsx", include_formatting=True)
+    mock_write_fmt.assert_called_once_with(mock_ss, "Sheet1", "SF")
